@@ -1,0 +1,1 @@
+cd apps/store && npx lint-staged

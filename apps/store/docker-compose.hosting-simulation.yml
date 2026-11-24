@@ -1,0 +1,47 @@
+services:
+  mariadb:
+    image: ${MARIADB_IMAGE:-mariadb:11.4}
+    restart: "no"
+    environment:
+      MARIADB_DATABASE: taqnia_store_hosting_local
+      MARIADB_USER: taqnia_simulation
+      MARIADB_PASSWORD: local-only-simulation-password
+      MARIADB_ROOT_PASSWORD: local-only-simulation-root-password
+    ports:
+      - "127.0.0.1:${MARIADB_HOST_PORT:-3307}:3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mariadb-admin ping -h 127.0.0.1 -u taqnia_simulation -plocal-only-simulation-password",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.hosting-simulation
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-bookworm-slim}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_BASE_URL: http://127.0.0.1:3310
+      PORT: 3000
+      DATABASE_HOST: mariadb
+      DATABASE_PORT: 3306
+      DATABASE_NAME: taqnia_store_hosting_local
+      DATABASE_USER: taqnia_simulation
+      DATABASE_PASSWORD: local-only-simulation-password
+      DATABASE_CONNECTION_LIMIT: 3
+      SESSION_SECRET: local-only-simulation-secret-at-least-32-characters
+      ANALYTICS_ENABLED: false
+    ports:
+      - "127.0.0.1:3310:3000"
+    restart: "no"

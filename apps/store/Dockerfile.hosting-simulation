@@ -1,0 +1,35 @@
+ARG NODE_IMAGE=node:24-bookworm-slim
+
+FROM ${NODE_IMAGE} AS dependencies
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM ${NODE_IMAGE} AS build
+WORKDIR /app
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY . .
+ENV NODE_ENV=production
+ENV APP_BASE_URL=http://127.0.0.1:3310
+ENV DATABASE_HOST=mariadb
+ENV DATABASE_PORT=3306
+ENV DATABASE_NAME=taqnia_store_hosting_local
+ENV DATABASE_USER=taqnia_simulation
+ENV DATABASE_PASSWORD=local-only-simulation-password
+ENV DATABASE_CONNECTION_LIMIT=3
+ENV SESSION_SECRET=local-only-simulation-secret-at-least-32-characters
+ENV ANALYTICS_ENABLED=false
+RUN npm run build
+
+FROM ${NODE_IMAGE} AS runtime
+ENV NODE_ENV=production
+ENV PORT=3000
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY --from=build --chown=node:node /app/.next ./.next
+COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/next.config.ts ./next.config.ts
+USER node
+EXPOSE 3000
+CMD ["npm", "start"]
